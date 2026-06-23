@@ -1,0 +1,9 @@
+# Exclude the Dune build output directory
+_build/
+
+# Exclude editor-specific files
+.eltype/
+.merlin
+.vscode/
+*.swp
+*~
