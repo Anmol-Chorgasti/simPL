@@ -1,0 +1,20 @@
+(library
+ (name interp)
+ (modules ast lexer parser main)
+ (libraries ounit2 qcheck ))
+
+
+(ocamllex
+ (modules lexer))
+
+(menhir
+ (modules parser))
+
+(env
+ (dev
+  (flags (:standard -w +a-32-33-50))))
+
+(executables
+ (names test)
+ (modules test)
+ (libraries interp ounit2 qcheck))
