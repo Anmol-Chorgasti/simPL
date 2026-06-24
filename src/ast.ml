@@ -1,23 +1,28 @@
 (**
-  BNF Form of CFG for simPL
-
-  e ::= x | i | b | e1 bop e2
+  e ::= x | e1 e2 | fun x -> e
+    | i | b | e1 bop e2
+    | (e1, e2) | fst e | snd e
+    | Left e | Right e
+    | match e with Left x1 -> e1 | Right x2 -> e2
     | if e1 then e2 else e3
     | let x = e1 in e2
 
-  bop ::= + | * | <=
+bop ::= + | - | * | <=
 
-  x ::= <identifiers>
+x ::= <identifiers>
 
-  i ::= <integers>
+i ::= <integers>
 
-  b ::= true | false
+b ::= true | false
+
+v ::= fun x -> e | i | b | (v1, v2) | Left v | Right v
 *)
 
 type bop = 
   | Add
   | Mult
   | Leq
+
 
 type expr =
   | Int of int
@@ -26,3 +31,4 @@ type expr =
   | Binop of bop * expr * expr
   | Let of string * expr * expr 
   | If of expr * expr * expr
+  

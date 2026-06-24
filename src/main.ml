@@ -1,9 +1,16 @@
 open Ast
 
-let parse (s : string) : expr =
-  let lexbuf = Lexing.from_string s in
-  let e = Parser.prog Lexer.read lexbuf in
-  e
+(**[Env] is a module that helps with making maps which have strings as keys. *)
+module Env = Map.Make(String)
+
+let empty_env = Env.empty
+
+(**[env] is an environment which maps a string to a value. *)
+type env = value Env.t
+and value = 
+  | VInt of int
+  | VBool of bool
+
 
 (** The error message produced if a variable is unbound. *)
 let unbound_var_err = "Unbound variable"
@@ -20,6 +27,12 @@ let if_branch_err = "Branches of if must have same type"
     of an [if] does not have type [bool]. *)
 let if_guard_err = "Guard of if must have type bool"
 
+let parse (s : string) : expr =
+  let lexbuf = Lexing.from_string s in
+  let e = Parser.prog Lexer.read lexbuf in
+  e
+
+(**[string_of_val x] is [x] represented as a string. *)
 let string_of_val x =
   match x with
   | Int a -> string_of_int a
@@ -81,7 +94,8 @@ step_bop bop e1 e2 =
 let rec eval e =
   if is_value e then e else eval (step e)
 
-(** [eval_big e] is the [e ==> v] relation. *)
+
+(** [eval_big e] is the big evaluation [e ==> v] relation. *)
 let rec eval_big e =
   match e with
   | Int _ | Bool _ -> e
@@ -104,9 +118,53 @@ and eval_if e1 e2 e3 =
   | Int _ | Var _  | Binop _ | Let _ | If _ -> failwith if_guard_err
 
 
+(**[eval_env env e] big evaluates [e] to a value [v] using the environment model. *)
+let rec eval_env (env : env) (e : expr) : value =
+  match e with
+  | Var x -> eval_var env x
+  | Int a -> VInt a
+  | Bool b -> VBool b
+  | Binop (x, e1, e2) -> eval_env_bop env x e1 e2
+  | If (e1, e2, e3) -> eval_env_if env e1 e2 e3
+  | Let (x, e1, e2) -> eval_env_let env x e1 e2
+and eval_env_let env x e1 e2 =
+  let v = eval_env env e1 in
+  let env' = Env.(add x v env) in
+  eval_env env' e2
+
+and eval_env_if env e1 e2 e3 =
+  match eval_env env e1 with
+  | VBool true -> eval_env env e2
+  | VBool false -> eval_env env e3
+  | VInt _ -> failwith if_guard_err
+
+and eval_env_bop env x e1 e2 =
+  match x, eval_env env e1, eval_env env e2 with
+  | Add, VInt x, VInt y -> VInt (x + y)
+  | Mult, VInt x, VInt y -> VInt (x * y)
+  | Leq, VInt x, VInt y -> VBool (x <= y)
+  | _ -> failwith bop_err
+
+and eval_var env x =
+ match Env.find_opt x env with
+ | Some v -> v
+ | None -> failwith unbound_var_err
+
+
+(**[extract_val e] represents value [e] as an expr.*)
+let extract_val e =
+  match e with
+  | VInt x -> Int x
+  | VBool y -> Bool y
+
+
+
 (**[interp s] evaluates [s] to [v] and returns [v] in string format. *)
 let interp s = 
   s |> parse |> eval |> string_of_val
 
-let interp_big s =
-  s |> parse |> eval_big |> string_of_val
+let interp_eval s =
+  s |> parse |> eval_env empty_env |> extract_val |> string_of_val
+
+let interp_big = interp_eval
+
