@@ -5,6 +5,21 @@ let parse (s : string) : expr =
   let e = Parser.prog Lexer.read lexbuf in
   e
 
+(** The error message produced if a variable is unbound. *)
+let unbound_var_err = "Unbound variable"
+
+(** The error message produced if binary operators and their
+    operands do not have the correct types. *)
+let bop_err = "Operator and operand type mismatch"
+
+(** The error message produced if the [then] and [else] branches
+    of an [if] do not have the same type. *)
+let if_branch_err = "Branches of if must have same type"
+
+(** The error message produced if the guard
+    of an [if] does not have type [bool]. *)
+let if_guard_err = "Guard of if must have type bool"
+
 let string_of_val x =
   match x with
   | Int a -> string_of_int a
@@ -34,7 +49,7 @@ let rec subst e2 v x =
 let rec step e = 
   match e with
   | Int _ | Bool _ -> e
-  | Var _ -> failwith "unbound variable"
+  | Var _ -> failwith unbound_var_err
   | Let (x, e1, e2) -> (
     match is_value e1, is_value e2 with
     | false, _ -> step (Let (x, step e1, e2))
@@ -49,20 +64,49 @@ let rec step e =
   )
   | If (Bool true, e2, _) -> e2
   | If (Bool false, _, e3) -> e3
-  | If (Int _, _, _) -> failwith "Guard of if must be Bool value"
+  | If (Int _, _, _) -> failwith if_guard_err
   | If (e1, e2, e3) -> step (If (step e1, e2, e3))
 and 
 step_bop bop e1 e2 = 
   match bop, e1, e2 with
   | Add, Int x, Int y -> Int (x + y)
+  | Add, _ , _ -> failwith bop_err
   | Mult, Int x, Int y -> Int (x * y)
+  | Mult, _, _ -> failwith bop_err
   | Leq, Int x, Int y -> Bool (x <= y)
-  | _ -> failwith "invalid combination of operator and operands"
+  | Leq, _, _ -> failwith bop_err
+
 
 (**[eval e] evaluates [e] completely to some value [v].*)
 let rec eval e =
   if is_value e then e else eval (step e)
 
+(** [eval_big e] is the [e ==> v] relation. *)
+let rec eval_big e =
+  match e with
+  | Int _ | Bool _ -> e
+  | Var _ -> failwith unbound_var_err
+  | Let (x, e1, e2) -> subst e2 (eval_big e1) x |> eval_big
+  | Binop (x, e1, e2) -> eval_bop x e1 e2
+  | If (e1, e2, e3) -> eval_if e1 e2 e3
+
+and eval_bop bop e1 e2 = 
+  match bop, eval_big e1, eval_big e2 with
+  | Add, Int x, Int y -> Int (x + y)
+  | Mult, Int x, Int y -> Int (x * y)
+  | Leq, Int x, Int y -> Bool (x <= y)
+  | _ -> failwith bop_err
+  
+and eval_if e1 e2 e3 =
+  match eval_big e1 with
+  | Bool true -> eval_big e2
+  | Bool false -> eval_big e3
+  | Int _ | Var _  | Binop _ | Let _ | If _ -> failwith if_guard_err
+
+
 (**[interp s] evaluates [s] to [v] and returns [v] in string format. *)
 let interp s = 
   s |> parse |> eval |> string_of_val
+
+let interp_big s =
+  s |> parse |> eval_big |> string_of_val
