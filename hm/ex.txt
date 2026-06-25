@@ -1,0 +1,76 @@
+CONSTANTS
+Constants don't generate any constraint set. They simply evaluate 
+directly to the lowest form of the type possible
+
+Rule : env |- i : int -| {}
+Rule : env |- b : bool -| {}
+
+NAMES
+The type of the name n, should be whatever the static environment says it has.
+What if the static environment does not have a binding?
+But then we cannot USE n, as currently we have removed let expressions from
+the language. So if n is not env, it cannot also be added to env. So this is a failure case
+
+Rule : env |- n : env(n) -| {}
+
+A Rule that MUST hold is when we start off with env
+we should have these bindings inside env
+{
+    ( + ) : int -> int -> int,
+    ( * ) : int -> int -> int,
+    ( <= ) : int -> int -> bool
+}
+These serve as our "base cases".
+
+
+IF EXPRESSIONS 
+
+Rule : env |- if e1 then e2 else e3 : 't -| C1, C2, C3, C
+
+What does this mean?
+1. 't needs to be a fresh variable, never used before by the HM algo in this program
+2. IF fresh 't
+then
+env |- e1 : t1 -| C1
+env |- e2 : t2 -| C2
+env |- e3 : t3 -| C3
+so, if tao is fresh, then e1 evaluates to some type t1, and generates constraint set C1
+and so forth.
+But with if expressions, another set of constraints come pre loaded, and this is C
+C = {t1 = bool, 't = t2, 't = t3}
+remember that C1,C2,C3 are constraints generated while INFERRING e1, e2, e3 respectively
+that is why we claim the entire IF expression generates the entire unioned set of the 
+above constraints.
+
+Example
+{} |- if true then 0 else 2 : 'a -| C
+    (we say this expression is a fresh alpha)
+    now we evaluate true
+    {} |- true : Bool -| {} (so C1 is empty)
+    next we evaluate 0
+    {} |- 0 : Int -| {} (since 0 is a constant, just like true, C2 is empty)
+    next we evaluate 2
+    {} |- 2 : Int -| {}
+    and we generate C for If using the predefined rule!
+    C = {bool = bool, 'a = Int, 'a = Int}
+    (clearly this intuitively is a valid IF expression)
+    and all constraints are generated!
+
+ANONYMOUS FUNCTIONS
+
+Rule : env |- fun x -> e : 't1 -> t2 -| C
+if fresh 't1 then
+    {env, x:'t1} |- e : t2 -| C
+
+What is C? C might give us clues to what 't1 is based on how x is used
+INSIDE the function!
+
+A worked Example
+{} |- fun x -> if x then 1 else 0 -| 
+    {x:'a} |- if x then 1 else 0 : 'b -|
+our C ends up being {'a = bool, 'b = int, 'b = int}
+based on how we used x inside e
+Watchout - note how the algorithm introduced 'b as a fresh type variable
+and now 
+we say our function has a type 'a -> 'b
+and we have the constraints that {'a = bool, 'b = int}
