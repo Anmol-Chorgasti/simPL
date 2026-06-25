@@ -32,3 +32,7 @@ type expr =
   | Let of string * expr * expr 
   | If of expr * expr * expr
   
+
+type typ = 
+  | TInt
+  | TBool

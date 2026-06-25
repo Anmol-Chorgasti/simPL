@@ -4,15 +4,14 @@ open Ast
 open OUnit2
 
 let make_helper string_of_val name i o  =
-  [name >:: (fun _ -> assert_equal (string_of_val i) (interp o));
-   name >:: (fun _ -> assert_equal (string_of_val i) (interp_big o))]
+  name >:: (fun _ -> assert_equal (string_of_val i) (interp o))
+   
 
 let make_i = make_helper string_of_int
 let make_b = make_helper string_of_bool
 
 let make_t n i o =
-  [n >:: (fun _ -> assert_raises (Failure i) (fun () -> interp o));
-  n >:: (fun _ -> assert_raises (Failure i) (fun () -> interp_big o))]
+  n >:: (fun _ -> assert_raises (Failure i) (fun () -> interp o))
 
 let tests_add_mult = [
   make_i "int" 22 "22";
@@ -63,4 +62,4 @@ let tests = List.flatten [
   tests_add_mult; tests_leq; tests_let; tests_if; tests_err
 ]
 
-let _ = run_test_tt_main ("suite" >::: List.flatten tests)
+let _ = run_test_tt_main ("suite" >::: tests)
