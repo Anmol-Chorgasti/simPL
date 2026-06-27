@@ -7,3 +7,6 @@ _build/
 .vscode/
 *.swp
 *~
+
+# Exclude theoretical notes on HM
+hm/

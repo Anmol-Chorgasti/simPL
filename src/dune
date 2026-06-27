@@ -1,6 +1,6 @@
 (library
  (name interp)
- (modules ast lexer parser main)
+ (modules ast lexer parser main type_inference)
  (libraries ounit2 qcheck ))
 
 

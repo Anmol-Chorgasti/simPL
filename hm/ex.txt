@@ -74,3 +74,75 @@ Watchout - note how the algorithm introduced 'b as a fresh type variable
 and now 
 we say our function has a type 'a -> 'b
 and we have the constraints that {'a = bool, 'b = int}
+
+
+FUNCTION APPLICATION
+
+Rule
+env |- e1 e2 : 't -| C1, C2, C
+
+Example
+env |- ( + ) 1 => this is a partial application
+but for our context, ( + ) is e1, and 1 is e2
+so let's infer both
+env |- ( + ) : int -> int -> int | {}
+env |- 1 : int | {}
+C states that t1 = t2 -> 't
+which in this case intuitively forces 't to be (int -> int) as t2 is int. 
+
+Henceforth, let I be the initial static env which comes preloaded with the basic functions, constants
+
+UNIFICATION algorithm
+
+Example
+'x -> ('x -> int) = int -> 'y
+'x -> 'x = 'y
+
+so in simple terms, if 'x -> 'x = 'y, then we can simply replace
+y in first equation WITH this 
+'x -> ('x -> int) = int -> ('x -> 'x)
+this forces us to substitute 'x with int, but how?
+note
+1. Both left and right sides can be shown as a function that takes in an input
+and produces a function type output
+2. Since inputs and output types must be same, we get TWO more equations
+
+'x = int
+('x -> int) = ('x -> 'x)
+The first equation is easier to work with and 'x is isolated so we trigger the second substitution.
+
+so we get 
+int -> int -> int = int -> int -> int
+The sequence of substitutions S was
+'y for 'x -> 'x; int for 'x
+
+formally
+{'x -> 'x / 'y}
+{int / 'x}
+
+LET EXPRESSIONS
+
+Generalization, type scheme, instantiation
+
+
+OKay, so to scope evertything out
+
+my to-do list is
+
+    add in closures and applications, figure out their expr, and also create their tokens and what to fire when
+
+    Implement a module type that behaves as a set of constraint TREES.
+    A constraint - some hardcoded rules on things for if, function evaluations, functions, let expressions, base cases. and it is of course, a tree.
+
+    Implement another module for a simple bst map that maintains the mapping from type variables to other types. but..this reveals something else, I need my constraint to be able to have both type variables and combinations of type variables. Right..and I need some sort of mechanism that can always spawn new type variables quickly. Right, so constraints needs to be able to handle strings, that's more or less it. Infact, I need to actually create a seperate smaller "type" that can handle strings and normal ints and bools and function types, and then have my constraint tree be a combination of these smaller "type" constructors.
+
+    Then implement the functions that solve the constraints using the unification algo logic
+
+    finally, infer an expression and make it return a type for the overall type variable the given solutions set, which for now consists of pairs. Each pair being a substitution IN Order, then I apply this substtitution to the final inferred type and reduce it to the actual type
+    naturally if this all fails, then I don't type check
+
+this is my rough outline. It's muddy, shaky, and has a lot of handwaving but this is how I am considering my initial design to be
+
+for generating fresh variables, use a ref counter. This needs to be global though
+and must be incremented every time we need a new type variable!
+
