@@ -17,68 +17,80 @@ let if_guard_err = "Guard of if must have type bool"
 let fun_app_err = "Cannot apply non function value to expression"
 
 
-module type StaticEnvironment = sig
-  (**[t] is the type of a static environment*)
-  type t
+(**[const] represents a pair of typs. IT implies that if (t1,t2) is a constraint, then t1 = t2. *)
+type const = typ * typ
+type const_set = const list
 
-  (**[empty] is the empty static environment*)
-  val empty : t
+let counter = ref 0
+let fresh_var () = 
+  counter := !counter + 1;
+  "a"^(string_of_int !counter)
 
-  (**[lookup env x] is the type bound to [x] in env.
-     Raises: [Failure] if [x] not found in env. *)
-  val lookup : t -> string -> typ
 
-  (**[extend env x ty] is [env] extended with a binding of [x] to [ty].*)
-  val extend : t -> string -> typ -> t
-end
+module SEnv = Map.Make(String)
+type env = typ SEnv.t
+let empty = SEnv.empty
 
-module StaticEnvironment : StaticEnvironment = struct
-  type t = (string * typ) list
-  let empty = []
-  let lookup (env:t) (x:string) : typ = 
-    match List.assoc_opt x env with
-    | None -> failwith unbound_var_err
-    | Some v -> v
-  let extend (env:t) (x:string) (ty:typ) : t = (x,ty)::env
-end
 
-(**
-(**[typeof env x] is the type of value [x] evaluates to.
-   Raises : [Failure] if [x] does not type check *)
-let rec typeof (env : StaticEnvironment.t) (x:expr) : typ =
-  let open StaticEnvironment in
-  match x with
-  | Int _ -> TInt
-  | Bool _ -> TBool
-  | Var z -> lookup env z
-  | Binop (bop, e1, e2) -> binop_type_helper env bop e1 e2
-  | Let (x, e1, e2) -> let_type_helper env x e1 e2
-  | If (e1, e2, e3) -> if_type_helper env e1 e2 e3
-and binop_type_helper env bop e1 e2 =
-  match bop, typeof env e1, typeof env e2 with
-  | (Add | Mult), TInt, TInt -> TInt
-  | Leq, TInt, TInt -> TBool
-  | _, TBool , _ | _, _, TBool -> failwith bop_err
-and let_type_helper env x e1 e2 =
-  let open StaticEnvironment in
-  let v = typeof env e1 in
-  let env' = extend env x v in
-  typeof env' e2
-and if_type_helper env e1 e2 e3 =
-  match typeof env e1 with
-  | TInt -> failwith if_guard_err
-  | TBool -> (
-    let (te2, te3) = (typeof env e2, typeof env e3) in
-    if te2=te3 then te2 else failwith if_branch_err
-  )
+(**[gen_consts env e] is inferred type of [e] and all constraints that must 
+   have a valid solution for [e] to type check. *)
+let rec gen_consts (env : env) (e : expr) : (typ * const_set) =
+  match e with
+  | Int _ -> (TInt, [])
+  | Bool _ -> (TBool, [])
+  | Var x -> var_helper env x
+  | Binop (bop, e1, e2)-> bop_helper env bop e1 e2
+  | If (e1, e2, e3) -> if_helper env e1 e2 e3
+  | Fun (x, e2) -> fun_helper env x e2
+  | App (e1, e2) -> app_helper env e1 e2
+  | Let _ -> failwith "todo"
+
+and app_helper env e1 e2 =
+  let new_var = fresh_var () in
+  let (e1_t, e1_c) = gen_consts env e1 in
+  let (e2_t, e2_c) = gen_consts env e2 in
+  let mc = List.rev_append e1_c e2_c in
+  let new_c = (e1_t, TFun (e2_t, TVar new_var)) :: mc in
+  (TVar new_var, new_c)
   
+and fun_helper env x e2 = 
+  let new_var = fresh_var () in
+  let new_env = SEnv.add x (TVar new_var) env in
+  let (e2_t, e2_c) = gen_consts new_env e2 in
+  (TFun (TVar new_var, e2_t),e2_c)
 
-(**[typecheck e] checks if [e] follows the correct semantics.*)
-let typecheck e =
-  match typeof StaticEnvironment.empty e with
-  | TInt | TBool -> true
+and if_helper env e1 e2 e3 =
+  let (e1_t, e1_c) = gen_consts env e1 in
+  let (e2_t, e2_c) = gen_consts env e2 in
+  let (e3_t, e3_c) = gen_consts env e3 in
+  let mc = List.rev_append e1_c e2_c |> List.rev_append e3_c
+  in
+  let new_var = fresh_var () in
+  let new_c = [
+    (e1_t, TBool);
+    (TVar new_var, e2_t);
+    (TVar new_var, e3_t)
+  ] |> List.rev_append mc 
+  in (TVar new_var, new_c)
 
-(*Placeholder to infer type of an expression*)
-let type_infer _ = failwith "todo"
+and var_helper env x =
+  match SEnv.find_opt x env with
+  | None -> failwith (x^": "^unbound_var_err)
+  | Some v -> (v,[])
 
-*)
+and bop_helper env bop e1 e2 =
+  let (e1_t, e1_c)  = gen_consts env e1 in
+  let (e2_t, e2_c) = gen_consts env e2 in
+  let mc = List.rev_append e1_c e2_c in
+  let new_mc =  [
+    (e1_t, TInt);
+    (e2_t, TInt)
+  ] |> List.rev_append mc
+  in
+  match bop with
+  | Add | Mult -> (TInt, new_mc)
+  | Leq -> (TBool, new_mc)
+
+
+
+

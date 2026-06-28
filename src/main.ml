@@ -14,17 +14,11 @@ and value =
   | VBool of bool
   | VFun of string * expr * env
 
-
+(**[parse s] is the representation of [s] as an Abstrat Syntax Tree. *)
 let parse (s : string) : expr =
   let lexbuf = Lexing.from_string s in
   let e = Parser.prog Lexer.read lexbuf in
   e
-
-let rec string_of_type = function
-  | TVar x -> x
-  | TInt -> "int"
-  | TBool -> "bool"
-  | TFun (x, y) -> (string_of_type x) ^ " -> " ^ (string_of_type y)
 
 (**[string_of_val x] is [x] represented as a string. *)
 let string_of_val x =
