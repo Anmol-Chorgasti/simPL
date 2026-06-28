@@ -38,4 +38,4 @@ type typ =
   | TInt
   | TBool
   | TFun of typ * typ
-  | TScheme of string list * typ
+
