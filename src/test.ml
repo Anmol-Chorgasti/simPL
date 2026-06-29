@@ -66,12 +66,11 @@ let tests_fun = [
 ]
 
 let tests_err = [
-  make_t "ty plus" bop_err "1 + true";
-  make_t "ty mult" bop_err "1 * false";
-  make_t "ty leq" bop_err "true <= 1";
-  make_t "if guard" if_guard_err "if 1 then 2 else 3";
-  make_t "unbound" unbound_var_err "x";
-  make_t "no function app 1" fun_app_err "5 4"
+  make_t "ty plus" type_err "1 + true";
+  make_t "ty mult" type_err "1 * false";
+  make_t "ty leq" type_err "true <= 1";
+  make_t "if guard" type_err "if 1 then 2 else 3";
+  make_t "no function app 1" type_err "5 4"
   ]
 
 

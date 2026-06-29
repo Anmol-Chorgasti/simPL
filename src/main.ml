@@ -77,4 +77,11 @@ and eval_var env x =
 (**[interp s] evaluates [s] to [v] and returns [v] in string format. *)
 let interp s = 
   let s_exp = parse s in
+  let _ = infer s_exp in
   s_exp |> eval_env empty_env |> string_of_val
+
+let interp_w_typ s =
+  let s_exp = parse s in
+  let s_t = infer s_exp in
+  let s_v = s_exp |> eval_env empty_env |> string_of_val in
+  "-: " ^ s_t ^ " = " ^ s_v |> print_endline

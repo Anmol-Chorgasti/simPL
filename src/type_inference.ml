@@ -169,7 +169,7 @@ let rec unify ?(acc=[]) (cs:const_set) : submap =
     | TInt, TBool | TBool, TInt -> failwith type_err
     | TFun _, (TBool | TInt) | (TBool | TInt), TFun _ -> failwith type_err
     | TInt, TInt | TBool, TBool -> unify ~acc:acc tl
-    | TFun (t1, t2) , TFun (t3, t4) -> unify ~acc:acc ((t1,t3) :: (t2,t4) :: tl)
+    | TFun (ty1, ty2) , TFun (ty3, ty4) -> unify ~acc:acc ((ty1,ty3) :: (ty2,ty4) :: tl)
     | TVar x, TVar y ->
       if x=y then unify ~acc:acc tl
       else
@@ -257,3 +257,18 @@ and bop_helper env bop e1 e2 =
   match bop with
   | Add | Mult -> (TInt, new_mc)
   | Leq -> (TBool, new_mc)
+
+
+
+let rec string_of_typ (t:typ) : string = 
+  match t with
+  | TInt -> "int"
+  | TBool -> "bool"
+  | TVar a -> "'"^a
+  | TFun (t1, t2) ->"(" ^ string_of_typ t1 ^ ")" ^ " -> " ^ string_of_typ t2
+
+let infer (e:expr) : string =
+  let et, ec = gen_consts empty e in
+  let sol = unify ec in
+  let et' = sub_solution sol et in
+  string_of_typ et'
