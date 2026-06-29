@@ -48,7 +48,7 @@ and eval_env_app env e1 e2 =
     let env_f' = Env.(add x v env_f) in
     eval_env env_f' e
   )
-  | VBool _ | VInt _ -> failwith fun_app_err
+  | VBool _ | VInt _ -> failwith type_err
 
 and eval_env_let env x e1 e2 =
   let v = eval_env env e1 in
@@ -59,14 +59,14 @@ and eval_env_if env e1 e2 e3 =
   match eval_env env e1 with
   | VBool true -> eval_env env e2
   | VBool false -> eval_env env e3
-  | VInt _ | VFun _-> failwith if_guard_err
+  | VInt _ | VFun _-> failwith type_err
 
 and eval_env_bop env x e1 e2 =
   match x, eval_env env e1, eval_env env e2 with
   | Add, VInt x, VInt y -> VInt (x + y)
   | Mult, VInt x, VInt y -> VInt (x * y)
   | Leq, VInt x, VInt y -> VBool (x <= y)
-  | _ -> failwith bop_err
+  | _ -> failwith type_err
 
 and eval_var env x =
  match Env.find_opt x env with

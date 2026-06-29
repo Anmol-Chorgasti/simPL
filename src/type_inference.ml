@@ -3,19 +3,7 @@ open Ast
 (** The error message produced if a variable is unbound. *)
 let unbound_var_err = "Unbound variable"
 
-(**The error message produced if binary operator used on non int types*)
-let bop_err = "Binary operation on non integer values"
-
-(** The error message produced if the [then] and [else] branches
-    of an [if] do not have the same type. *)
-let if_branch_err = "Branches of if must have same type"
-
-(** The error message produced if the guard
-    of an [if] does not have type [bool]. *)
-let if_guard_err = "Guard of if must have type bool"
-
-let fun_app_err = "Cannot apply non function value to expression"
-
+(** The error message produced if unification fails. *)
 let type_err = "Constraint set cannot be unified due to type error"
 
 
@@ -265,7 +253,7 @@ let rec string_of_typ (t:typ) : string =
   | TInt -> "int"
   | TBool -> "bool"
   | TVar a -> "'"^a
-  | TFun (t1, t2) ->"(" ^ string_of_typ t1 ^ ")" ^ " -> " ^ string_of_typ t2
+  | TFun (t1, t2) -> string_of_typ t1 ^ " -> " ^ string_of_typ t2
 
 let infer (e:expr) : string =
   let et, ec = gen_consts empty e in
