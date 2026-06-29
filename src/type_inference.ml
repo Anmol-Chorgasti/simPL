@@ -44,7 +44,7 @@ module InstMap = struct
     List.map (fun x -> (x, fresh_var ())) xs
 end
 
-(**[substitute e t1 t2] is a type with all occurences of [t1] in it replaced with [t2].*)
+(**[substitute e t1 t2] is a type with all occurences of [t1] in [e] replaced with [t2].*)
 let rec substitute (e:typ) (tv:string) (t2:typ) : typ =
   match e with
   | TInt | TBool -> e
@@ -87,11 +87,12 @@ let generalize (env:env) (t:typ) : tscheme =
       fun _ v acc -> 
         match v with
         | Ins t1  -> List.rev_append (aux t1) acc
-        | Gen (xs, t1) -> List.rev_append (fvars xs t1) acc
+        | Gen (xs, t1) -> List.rev_append (fvars xs t1) acc 
+        (* only need free vars from gen type scheme, local variables are not necessary. *)
     ) env [] 
   in
   let tvars_only = fvars vars_env t in
-  Gen (tvars_only, t)
+  Gen (List.sort_uniq compare tvars_only, t)
 
 
 (*UNIFICATION WORK*)
@@ -104,27 +105,65 @@ let rec occurs (e: typ) (x: string) : bool =
   | TInt | TBool -> false
   | TFun (e1, e2) -> (occurs e1 x) || (occurs e2 x)
 
+
+
+(**[sub_const x tr ct] is a new constraint with type [tr] substituted for type variable [x]*)
 let sub_const (x:string) (tr:typ) (ct:const) : const =
     match ct with
     | t1, t2 -> (substitute t1 x tr, substitute t2 x tr)
 
+
+
+(**[sub_map x tr s] is the (key, value) pair [s] with type var x replaced by [tr] in value. *)  
 let sub_map (x:string) (tr:typ) (s:string * typ) : string * typ =
   match s with
   | k, t -> k, substitute t x tr
 
-let new_cs cs x tr = List.map (sub_const x tr) cs
 
+
+(**[update_cs x tr] is a constraint list with all constraints in [cs] having x replaced by [tr].*)
+let update_cs cs x tr = List.map (sub_const x tr) cs
+
+
+
+(**[update_acc acc x tr] is a list of substitutions [acc] with
+  1. A new substituion of replacing type var [x] with [tr]
+  2. All other mentions of [x] replaced with [tr] in [acc]. *)
 let update_acc acc x tr = 
   (*first replace all occurences of TVar x with tr in existing acc*)
   let nacc = List.map (sub_map x tr) acc in
   (x,tr)::nacc
+
+
+
+(**[sub_solution mp t] is a type with all substitutions in [mp] applied in order to [t]*)
+let rec sub_solution (mp:submap) (t:typ) : typ = 
+  match mp with
+  | [] -> t
+  | (x, tr) :: rest -> substitute t x tr |> (sub_solution rest)
+
+
+
+(**[sub_env mp env] is a static environment with all substitutions in [mp] applied in order to
+   every key,value pair in [env]*)
+let sub_env (mp:submap) (env:env) : env =
+  let sub_aux_tscheme mp (t:tscheme) : tscheme =
+    match t with
+    | Ins ty -> Ins (sub_solution mp ty)
+    | Gen (xs, ty) ->
+      let new_mp = List.filter (fun (x,_) -> not (List.mem x xs)) mp in
+      Gen (xs, sub_solution new_mp ty)
+  in
+  SEnv.map (fun t -> sub_aux_tscheme mp t) env
+
+
 
 (**[unify cs] unifies constraint set [cs] and produces an ordered list of 
    substitutions made as the solution. 
    Raises: [Type error] if constraint set cannot be unified. *)
 let rec unify ?(acc=[]) (cs:const_set) : submap = 
   match cs with
-  | [] -> acc
+  | [] -> List.rev acc
   | (t1, t2) :: tl -> 
     match t1, t2 with
     | TInt, TBool | TBool, TInt -> failwith type_err
@@ -134,15 +173,17 @@ let rec unify ?(acc=[]) (cs:const_set) : submap =
     | TVar x, TVar y ->
       if x=y then unify ~acc:acc tl
       else
-      let new_tl = new_cs tl x (TVar y) in
-      let new_acc = update_acc acc x (TVar y) in
+      let new_tl = update_cs tl x (TVar y) in
+      let new_acc = update_acc acc x (TVar y) in 
+      (*a type variable x is updated with another y but as TVar y and not y only!*)
       unify ~acc:new_acc new_tl
     | TVar x, tr | tr, TVar x -> 
       if occurs tr x then failwith type_err
       else
-      let new_tl = new_cs tl x tr in
+      let new_tl = update_cs tl x tr in
       let new_acc = update_acc acc x tr in
       unify ~acc:new_acc new_tl
+
 
 
 (**[gen_consts env e] is inferred type of [e] and all constraints that must 
@@ -156,7 +197,16 @@ let rec gen_consts (env : env) (e : expr) : (typ * const_set) =
   | If (e1, e2, e3) -> if_helper env e1 e2 e3
   | Fun (x, e2) -> fun_helper env x e2
   | App (e1, e2) -> app_helper env e1 e2
-  | Let _ -> failwith "todo"
+  | Let (x, e1, e2) -> let_helper env x e1 e2
+
+and let_helper env x e1 e2 =
+  let (e1_t, e1_c) = gen_consts env e1 in
+  let e1_s = unify e1_c in
+  let e1_u = sub_solution e1_s e1_t in
+  let new_env = sub_env e1_s env in
+  let gen_e1_u = generalize new_env e1_u in
+  let final_env = SEnv.add x gen_e1_u new_env in
+  gen_consts final_env e2
 
 and app_helper env e1 e2 =
   let new_var = fresh_var () in
